@@ -35,12 +35,7 @@ export const ChatPage = ({ userName, isAuthenticated }: ChatProps) => {
         >
           {messages.map((message, index) => {
             return (
-              <ChatMessage
-                key={index}
-                text={message.content}
-                role={message.role}
-                userName={userName}
-              />
+              <ChatMessage key={index} message={message} userName={userName} />
             );
           })}
         </div>
