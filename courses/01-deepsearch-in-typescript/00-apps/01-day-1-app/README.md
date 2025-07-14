@@ -51,6 +51,9 @@ AUTH_DISCORD_SECRET="your-discord-client-secret"
 
 # AI
 GOOGLE_GENERATIVE_AI_API_KEY="your-google-ai-api-key"
+
+# Web Search
+SERPER_API_KEY="your-serper-api-key"
 ```
 
 6. Run the database migrations:
