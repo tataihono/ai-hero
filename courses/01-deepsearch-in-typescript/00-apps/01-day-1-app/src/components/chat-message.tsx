@@ -1,6 +1,6 @@
 import ReactMarkdown, { type Components } from "react-markdown";
 import type { Message } from "ai";
-import { Wrench, CheckCircle, Clock } from "lucide-react";
+import { Wrench, CheckCircle, Clock, ExternalLink } from "lucide-react";
 
 export type MessagePart = NonNullable<Message["parts"]>[number];
 
@@ -343,12 +343,46 @@ const ToolInvocationPart = ({
   );
 };
 
+const SourcePart = ({
+  part,
+}: {
+  part: Extract<MessagePart, { type: "source" }>;
+}) => {
+  const { source } = part;
+
+  return (
+    <div className="mt-4">
+      <a
+        href={source.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block rounded-lg border border-gray-600 bg-gray-800/30 p-3 transition-colors hover:bg-gray-800/50"
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex size-6 items-center justify-center rounded-full bg-blue-500/20">
+            <ExternalLink className="size-3 text-blue-400" />
+          </div>
+          <div className="min-w-0 flex-1">
+            {source.title && (
+              <div className="line-clamp-2 font-medium text-gray-200">
+                {source.title}
+              </div>
+            )}
+          </div>
+        </div>
+      </a>
+    </div>
+  );
+};
+
 const MessagePartRenderer = ({ part }: { part: MessagePart }) => {
   switch (part.type) {
     case "text":
       return <TextPart part={part} />;
     case "tool-invocation":
       return <ToolInvocationPart part={part} />;
+    case "source":
+      return <SourcePart part={part} />;
     default:
       return null;
   }
