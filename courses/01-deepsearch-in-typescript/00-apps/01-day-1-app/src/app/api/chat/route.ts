@@ -48,6 +48,14 @@ export async function POST(request: Request) {
 
   return createDataStreamResponse({
     execute: async (dataStream) => {
+      // Send the new chat ID to the frontend if this is a new chat
+      if (!chatId) {
+        dataStream.writeData({
+          type: "NEW_CHAT_CREATED",
+          chatId: finalChatId,
+        });
+      }
+
       const result = streamText({
         model,
         messages,
@@ -87,7 +95,12 @@ Be thorough in your searches and provide comprehensive, well-sourced answers.`,
             },
           },
         },
-        onFinish({ text, finishReason, usage, response }) {
+        onFinish({
+          text: _text,
+          finishReason: _finishReason,
+          usage: _usage,
+          response,
+        }) {
           const responseMessages = response.messages;
 
           const updatedMessages = appendResponseMessages({
