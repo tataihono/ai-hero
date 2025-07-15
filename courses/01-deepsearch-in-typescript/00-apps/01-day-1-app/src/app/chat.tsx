@@ -1,28 +1,54 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useChat } from "@ai-sdk/react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { ChatMessage } from "~/components/chat-message";
 import { SignInModal } from "~/components/sign-in-modal";
 import { isNewChatCreated } from "~/utils";
+import type { Message } from "ai";
 
 interface ChatProps {
   userName: string;
   isAuthenticated: boolean;
-  chatId?: string;
+  chatId: string | undefined;
+  initialMessages: Message[];
 }
 
-export const ChatPage = ({ userName, isAuthenticated, chatId }: ChatProps) => {
+export const ChatPage = ({
+  userName,
+  isAuthenticated,
+  chatId,
+  initialMessages,
+}: ChatProps) => {
   const router = useRouter();
-  const { messages, input, handleInputChange, handleSubmit, isLoading, data } =
-    useChat({
-      body: {
-        chatId,
-      },
-    });
+  const previousChatId = useRef<string | undefined>();
+
+  const {
+    messages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    isLoading,
+    data,
+    setMessages,
+  } = useChat({
+    body: {
+      chatId,
+    },
+    initialMessages,
+  });
+
   const [showSignInModal, setShowSignInModal] = useState(false);
+
+  // Reset messages when chatId changes
+  useEffect(() => {
+    if (previousChatId.current !== chatId) {
+      setMessages(initialMessages);
+      previousChatId.current = chatId;
+    }
+  }, [chatId, initialMessages, setMessages]);
 
   // Handle new chat creation and redirect
   useEffect(() => {

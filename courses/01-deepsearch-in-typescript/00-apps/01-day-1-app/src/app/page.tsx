@@ -1,17 +1,10 @@
 import { PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { auth } from "~/server/auth/index.ts";
+import { getChats, getChat } from "~/server/db/queries.ts";
 import { ChatPage } from "./chat.tsx";
 import { AuthButton } from "../components/auth-button.tsx";
-
-const chats = [
-  {
-    id: "1",
-    title: "My First Chat",
-  },
-];
-
-const activeChatId = "1";
+import type { Message } from "ai";
 
 export default async function HomePage({
   searchParams,
@@ -22,6 +15,19 @@ export default async function HomePage({
   const session = await auth();
   const userName = session?.user?.name ?? "Guest";
   const isAuthenticated = !!session?.user;
+
+  // Fetch chats from database if user is authenticated
+  const chats =
+    isAuthenticated && session?.user?.id ? await getChats(session.user.id) : [];
+
+  // Fetch chat messages if chatId is provided and user is authenticated
+  let initialMessages: Message[] = [];
+  if (id && isAuthenticated && session?.user?.id) {
+    const chat = await getChat(id, session.user.id);
+    if (chat?.messages) {
+      initialMessages = chat.messages;
+    }
+  }
 
   return (
     <div className="flex h-screen bg-gray-950">
@@ -46,9 +52,9 @@ export default async function HomePage({
             chats.map((chat) => (
               <div key={chat.id} className="flex items-center gap-2">
                 <Link
-                  href={`/?chatId=${chat.id}`}
+                  href={`/?id=${chat.id}`}
                   className={`flex-1 rounded-lg p-3 text-left text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-                    chat.id === activeChatId
+                    chat.id === id
                       ? "bg-gray-700"
                       : "hover:bg-gray-750 bg-gray-800"
                   }`}
@@ -77,6 +83,7 @@ export default async function HomePage({
         userName={userName}
         isAuthenticated={isAuthenticated}
         chatId={id}
+        initialMessages={initialMessages}
       />
     </div>
   );

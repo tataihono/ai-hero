@@ -78,8 +78,9 @@ export const getChat = async (chatId: string, userId: string) => {
   // Convert back to Message format
   const messageList: Message[] = chatMessages.map((msg) => ({
     id: msg.id,
-    role: msg.role as "user" | "assistant" | "system",
-    content: msg.parts as string,
+    role: msg.role as "user" | "assistant",
+    parts: msg.parts as Message["parts"],
+    content: "",
   }));
 
   return {
