@@ -21,15 +21,14 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as {
     messages: Array<Message>;
-    chatId?: string;
+    chatId: string;
+    isNewChat: boolean;
   };
 
-  const { messages, chatId } = body;
+  const { messages, chatId, isNewChat } = body;
 
-  // Create a new chat if chatId is not provided
-  let finalChatId = chatId;
-  if (!finalChatId) {
-    finalChatId = crypto.randomUUID();
+  // Create a new chat if isNewChat is true
+  if (isNewChat) {
     // Create the chat with just the user's message before starting the stream
     const userMessage = messages[messages.length - 1];
     if (userMessage) {
@@ -39,7 +38,7 @@ export async function POST(request: Request) {
 
       await upsertChat({
         userId: session.user.id,
-        chatId: finalChatId,
+        chatId,
         title,
         messages,
       });
@@ -49,10 +48,10 @@ export async function POST(request: Request) {
   return createDataStreamResponse({
     execute: async (dataStream) => {
       // Send the new chat ID to the frontend if this is a new chat
-      if (!chatId) {
+      if (isNewChat) {
         dataStream.writeData({
           type: "NEW_CHAT_CREATED",
-          chatId: finalChatId,
+          chatId,
         });
       }
 
@@ -117,7 +116,7 @@ Be thorough in your searches and provide comprehensive, well-sourced answers.`,
 
             upsertChat({
               userId: session.user.id,
-              chatId: finalChatId,
+              chatId,
               title,
               messages: updatedMessages,
             }).catch((error) => {

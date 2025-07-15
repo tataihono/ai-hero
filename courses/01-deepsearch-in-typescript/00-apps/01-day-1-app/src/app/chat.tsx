@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useChat } from "@ai-sdk/react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
@@ -12,7 +12,8 @@ import type { Message } from "ai";
 interface ChatProps {
   userName: string;
   isAuthenticated: boolean;
-  chatId: string | undefined;
+  chatId: string;
+  isNewChat: boolean;
   initialMessages: Message[];
 }
 
@@ -20,35 +21,21 @@ export const ChatPage = ({
   userName,
   isAuthenticated,
   chatId,
+  isNewChat,
   initialMessages,
 }: ChatProps) => {
   const router = useRouter();
-  const previousChatId = useRef<string | undefined>();
 
-  const {
-    messages,
-    input,
-    handleInputChange,
-    handleSubmit,
-    isLoading,
-    data,
-    setMessages,
-  } = useChat({
-    body: {
-      chatId,
-    },
-    initialMessages,
-  });
+  const { messages, input, handleInputChange, handleSubmit, isLoading, data } =
+    useChat({
+      body: {
+        chatId,
+        isNewChat,
+      },
+      initialMessages,
+    });
 
   const [showSignInModal, setShowSignInModal] = useState(false);
-
-  // Reset messages when chatId changes
-  useEffect(() => {
-    if (previousChatId.current !== chatId) {
-      setMessages(initialMessages);
-      previousChatId.current = chatId;
-    }
-  }, [chatId, initialMessages, setMessages]);
 
   // Handle new chat creation and redirect
   useEffect(() => {
