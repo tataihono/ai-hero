@@ -50,7 +50,7 @@ export const upsertChat = async (opts: {
     const messageValues = messageList.map((message, index) => ({
       chatId,
       role: message.role,
-      parts: message.content,
+      parts: message.parts,
       order: index,
     }));
 
@@ -58,14 +58,14 @@ export const upsertChat = async (opts: {
   }
 };
 
-export const getChat = async (chatId: string) => {
+export const getChat = async (chatId: string, userId: string) => {
   const chat = await db
     .select()
     .from(chats)
     .where(eq(chats.id, chatId))
     .limit(1);
 
-  if (chat.length === 0) {
+  if (chat.length === 0 || chat[0]?.userId !== userId) {
     return null;
   }
 
