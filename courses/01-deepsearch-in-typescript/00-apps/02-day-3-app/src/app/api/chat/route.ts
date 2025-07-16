@@ -12,6 +12,12 @@ import { upsertChat } from "~/server/db/queries";
 import { eq } from "drizzle-orm";
 import { db } from "~/server/db";
 import { chats } from "~/server/db/schema";
+import { Langfuse } from "langfuse";
+import { env } from "~/env";
+
+const langfuse = new Langfuse({
+  environment: env.NODE_ENV,
+});
 
 export const maxDuration = 60;
 
@@ -33,6 +39,17 @@ export async function POST(request: Request) {
   if (!messages.length) {
     return new Response("No messages provided", { status: 400 });
   }
+
+  // Determine the current chat ID - if it's a new chat, we'll use the provided chatId
+  // If it's not a new chat, we'll use the existing chatId from the request
+  const currentChatId = chatId;
+
+  // Create a trace for this chat session
+  const trace = langfuse.trace({
+    sessionId: currentChatId,
+    name: "chat",
+    userId: session.user.id,
+  });
 
   // If this is a new chat, create it with the user's message
   if (isNewChat) {
@@ -66,7 +83,13 @@ export async function POST(request: Request) {
         model,
         messages,
         maxSteps: 10,
-        experimental_telemetry: { isEnabled: true },
+        experimental_telemetry: {
+          isEnabled: true,
+          functionId: `agent`,
+          metadata: {
+            langfuseTraceId: trace.id,
+          },
+        },
         system: `You are a helpful AI assistant with access to real-time web search capabilities. When answering questions:
 
 1. Always search the web for up-to-date information when relevant
@@ -115,6 +138,9 @@ Remember to use the searchWeb tool whenever you need to find current information
             title: lastMessage.content.slice(0, 50) + "...",
             messages: updatedMessages,
           });
+
+          // Flush the trace to Langfuse
+          await langfuse.flushAsync();
         },
       });
 
