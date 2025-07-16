@@ -55,19 +55,81 @@ export async function POST(request: Request) {
 
   // If this is a new chat, create it with the user's message
   if (isNewChat) {
-    await upsertChat({
-      userId: session.user.id,
-      chatId: chatId,
-      title: messages[messages.length - 1]!.content.slice(0, 50) + "...",
-      messages: messages, // Only save the user's message initially
+    const createChatSpan = trace.span({
+      name: "create-new-chat",
+      input: {
+        userId: session.user.id,
+        chatId: chatId,
+        title: messages[messages.length - 1]!.content.slice(0, 50) + "...",
+        messageCount: messages.length,
+      },
     });
+
+    try {
+      await upsertChat({
+        userId: session.user.id,
+        chatId: chatId,
+        title: messages[messages.length - 1]!.content.slice(0, 50) + "...",
+        messages: messages, // Only save the user's message initially
+      });
+
+      createChatSpan.end({
+        output: {
+          success: true,
+          chatId: chatId,
+        },
+      });
+    } catch (error) {
+      createChatSpan.end({
+        output: {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        },
+      });
+      throw error;
+    }
   } else {
     // Verify the chat belongs to the user
-    const chat = await db.query.chats.findFirst({
-      where: eq(chats.id, chatId),
+    const verifyChatSpan = trace.span({
+      name: "verify-chat-ownership",
+      input: {
+        chatId: chatId,
+        userId: session.user.id,
+      },
     });
-    if (!chat || chat.userId !== session.user.id) {
-      return new Response("Chat not found or unauthorized", { status: 404 });
+
+    try {
+      const chat = await db.query.chats.findFirst({
+        where: eq(chats.id, chatId),
+      });
+
+      if (!chat || chat.userId !== session.user.id) {
+        verifyChatSpan.end({
+          output: {
+            success: false,
+            error: "Chat not found or unauthorized",
+            chatFound: !!chat,
+            chatUserId: chat?.userId,
+          },
+        });
+        return new Response("Chat not found or unauthorized", { status: 404 });
+      }
+
+      verifyChatSpan.end({
+        output: {
+          success: true,
+          chatId: chat.id,
+          chatTitle: chat.title,
+        },
+      });
+    } catch (error) {
+      verifyChatSpan.end({
+        output: {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        },
+      });
+      throw error;
     }
   }
 
@@ -192,12 +254,40 @@ Remember to use the searchWeb tool whenever you need to find current information
           }
 
           // Save the complete chat history
-          await upsertChat({
-            userId: session.user.id,
-            chatId: chatId,
-            title: lastMessage.content.slice(0, 50) + "...",
-            messages: updatedMessages,
+          const saveChatHistorySpan = trace.span({
+            name: "save-chat-history",
+            input: {
+              userId: session.user.id,
+              chatId: chatId,
+              title: lastMessage.content.slice(0, 50) + "...",
+              messageCount: updatedMessages.length,
+            },
           });
+
+          try {
+            await upsertChat({
+              userId: session.user.id,
+              chatId: chatId,
+              title: lastMessage.content.slice(0, 50) + "...",
+              messages: updatedMessages,
+            });
+
+            saveChatHistorySpan.end({
+              output: {
+                success: true,
+                chatId: chatId,
+                savedMessageCount: updatedMessages.length,
+              },
+            });
+          } catch (error) {
+            saveChatHistorySpan.end({
+              output: {
+                success: false,
+                error: error instanceof Error ? error.message : "Unknown error",
+              },
+            });
+            throw error;
+          }
 
           // Flush the trace to Langfuse
           await langfuse.flushAsync();
