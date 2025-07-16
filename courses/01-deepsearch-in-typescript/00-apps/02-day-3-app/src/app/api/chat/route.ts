@@ -7,6 +7,7 @@ import {
 import { model } from "~/model";
 import { auth } from "~/server/auth";
 import { searchSerper } from "~/serper";
+import { bulkCrawlWebsites } from "~/scraper";
 import { z } from "zod";
 import { upsertChat } from "~/server/db/queries";
 import { eq } from "drizzle-orm";
@@ -14,6 +15,7 @@ import { db } from "~/server/db";
 import { chats } from "~/server/db/schema";
 import { Langfuse } from "langfuse";
 import { env } from "~/env";
+import { cacheWithRedis } from "~/server/redis/redis";
 
 const langfuse = new Langfuse({
   environment: env.NODE_ENV,
@@ -90,7 +92,7 @@ export async function POST(request: Request) {
             langfuseTraceId: trace.id,
           },
         },
-        system: `You are a helpful AI assistant with access to real-time web search capabilities. When answering questions:
+        system: `You are a helpful AI assistant with access to real-time web search capabilities and web scraping tools. When answering questions:
 
 1. Always search the web for up-to-date information when relevant
 2. ALWAYS format URLs as markdown links using the format [title](url)
@@ -98,8 +100,10 @@ export async function POST(request: Request) {
 4. If you're unsure about something, search the web to verify
 5. When providing information, always include the source where you found it using markdown links
 6. Never include raw URLs - always use markdown link format
+7. Use the scrapePages tool when you need to extract the full content from specific web pages that you've found through search
+8. IMPORTANT: After finding relevant URLs from search results, ALWAYS use the scrapePages tool to get the full content of those pages. Never rely solely on search snippets.
 
-Remember to use the searchWeb tool whenever you need to find current information.`,
+Remember to use the searchWeb tool whenever you need to find current information, and use scrapePages when you need to extract detailed content from specific pages.`,
         tools: {
           searchWeb: {
             parameters: z.object({
@@ -116,6 +120,45 @@ Remember to use the searchWeb tool whenever you need to find current information
                 link: result.link,
                 snippet: result.snippet,
               }));
+            },
+          },
+          scrapePages: {
+            parameters: z.object({
+              urls: z
+                .array(z.string())
+                .describe("Array of URLs to scrape for full content"),
+            }),
+            execute: async ({ urls }, { abortSignal }) => {
+              const scrapePagesWithCache = cacheWithRedis(
+                "scrapePages",
+                async (urlsToScrape: string[]) => {
+                  const result = await bulkCrawlWebsites({
+                    urls: urlsToScrape,
+                  });
+
+                  if (result.success) {
+                    return result.results.map(
+                      ({ url, result: crawlResult }) => ({
+                        url,
+                        content: crawlResult.data,
+                        success: true,
+                      }),
+                    );
+                  } else {
+                    return result.results.map(
+                      ({ url, result: crawlResult }) => ({
+                        url,
+                        content: crawlResult.success
+                          ? crawlResult.data
+                          : `Error: ${crawlResult.error}`,
+                        success: crawlResult.success,
+                      }),
+                    );
+                  }
+                },
+              );
+
+              return await scrapePagesWithCache(urls);
             },
           },
         },
