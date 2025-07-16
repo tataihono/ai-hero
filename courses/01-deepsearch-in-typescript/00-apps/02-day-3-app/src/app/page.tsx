@@ -14,7 +14,11 @@ export default async function HomePage({
   const session = await auth();
   const userName = session?.user?.name ?? "Guest";
   const isAuthenticated = !!session?.user;
-  const { id: chatId } = await searchParams;
+  const { id: chatIdFromUrl } = await searchParams;
+
+  // Generate a stable chatId - use the URL chatId if it exists, otherwise generate a new one
+  const chatId = chatIdFromUrl ?? crypto.randomUUID();
+  const isNewChat = !chatIdFromUrl;
 
   // Fetch chats if user is authenticated
   const chats =
@@ -24,8 +28,8 @@ export default async function HomePage({
 
   // Fetch active chat if chatId is present and user is authenticated
   const activeChat =
-    chatId && isAuthenticated && session.user?.id
-      ? await getChat({ userId: session.user.id, chatId })
+    chatIdFromUrl && isAuthenticated && session.user?.id
+      ? await getChat({ userId: session.user.id, chatId: chatIdFromUrl })
       : null;
 
   // Map the messages to the correct format for useChat
@@ -62,7 +66,7 @@ export default async function HomePage({
                 <Link
                   href={`/?id=${chat.id}`}
                   className={`flex-1 rounded-lg p-3 text-left text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-                    chat.id === chatId
+                    chat.id === chatIdFromUrl
                       ? "bg-gray-700"
                       : "hover:bg-gray-750 bg-gray-800"
                   }`}
@@ -88,9 +92,11 @@ export default async function HomePage({
       </div>
 
       <ChatPage
+        key={chatId}
         userName={userName}
         isAuthenticated={isAuthenticated}
         chatId={chatId}
+        isNewChat={isNewChat}
         initialMessages={initialMessages}
       />
     </div>
