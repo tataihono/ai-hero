@@ -81,6 +81,16 @@ export async function POST(request: Request) {
         });
       }
 
+      const currentDate = new Date().toLocaleString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZoneName: "short",
+      });
+
       const result = streamText({
         model,
         messages,
@@ -92,7 +102,11 @@ export async function POST(request: Request) {
             langfuseTraceId: trace.id,
           },
         },
-        system: `You are a helpful AI assistant with access to real-time web search capabilities and web scraping tools. When answering questions:
+        system: `You are a helpful AI assistant with access to real-time web search capabilities and web scraping tools. 
+
+CURRENT DATE AND TIME: ${currentDate}
+
+When answering questions:
 
 1. Always search the web for up-to-date information when relevant
 2. ALWAYS format URLs as markdown links using the format [title](url)
@@ -101,7 +115,9 @@ export async function POST(request: Request) {
 5. When providing information, always include the source where you found it using markdown links
 6. Never include raw URLs - always use markdown link format
 7. Use the scrapePages tool when you need to extract the full content from specific web pages that you've found through search
-8. IMPORTANT: After finding relevant URLs from search results, ALWAYS use the scrapePages tool to get the full content of those pages. Never rely solely on search snippets.
+8. IMPORTANT: After finding relevant URLs from search results, ALWAYS use the scrapePages tool to get the full content of those pages. Never rely solely on search snippets
+9. When users ask for "up to date" information, "current" information, or "latest" news, reference the current date and time (${currentDate}) to provide context about what "up to date" means
+10. When search results include publication dates, mention these dates to help users understand how recent the information is
 
 Remember to use the searchWeb tool whenever you need to find current information, and use scrapePages when you need to extract detailed content from specific pages.`,
         tools: {
@@ -119,6 +135,7 @@ Remember to use the searchWeb tool whenever you need to find current information
                 title: result.title,
                 link: result.link,
                 snippet: result.snippet,
+                date: result.date,
               }));
             },
           },
